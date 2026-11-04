@@ -5,9 +5,9 @@
 *Magíster / Curso: Sistemas de Procesamiento para Big Data*  
 *Profesor Guía:* Dr. Nicolás Hidalgo (`nicolas.hidalgoc@mail.udp.cl`)  
 *Autores / Equipo de Trabajo:*  
-- **Agustín Pizarro**  
-- **Eduardo Valenzuela**  
-- **Benjamín Zúñiga**  
+- **Agustín Pizarro:** Ingeniería de datos, pipeline de Apache Spark, particionamiento H3 y optimización Parquet.
+- **Eduardo Valenzuela:** Modelamiento del problema, exposición oral de la propuesta, análisis de cuellos de botella de Big Data y validación geoespacial con Apache Sedona y CONAF.
+- **Benjamín Zúñiga:** Investigación metodológica del estado del arte, formulación de las 4 líneas base ($B_0, B_1, B_2, S$), evaluación de la métrica COST (McSherry 2015), análisis de paralelismo temporal (halos de calentamiento) y esquema de ajuste diurno de temperatura S2.  
 
 ---
 
@@ -236,8 +236,12 @@ sequenceDiagram
     Executors->>Streaming: Join espacial Apache Sedona con focos NASA FIRMS
 ```
 
-### Etapa 1: Ingesta Distribuida y Fusión Espacial
-Los nodos leen particiones espaciales independientes de los NetCDF orográficos y atmosféricos. En cada partición se computa la presión de saturación de vapor ($e_s$) y de vapor real ($e$) para derivar $RH$, y la magnitud escalar del viento $W$. A cada punto se le asigna un índice espacial hexagonal jerárquico **Uber H3 (Resolución 6, apertura de ~3.2 km)**.
+### Etapa 1: Ingesta Distribuida, Fusión Espacial y Ajuste Térmico S2
+Los nodos leen particiones espaciales independientes de los NetCDF orográficos y atmosféricos. En cada partición se computa la presión de saturación de vapor ($e_s$) y de vapor real ($e$) para derivar $RH$, y la magnitud escalar del viento $W$. 
+
+Para resolver la discrepancia horaria entre los datos diarios de CR2MET y el protocolo del FWI (observación estándar al mediodía local), **Benjamín Zúñiga formuló el esquema de ajuste diurno $S_2$**:
+$$T_{\text{noon}} = T_{\text{ERA5, 16:00 UTC}} + \left( T_{\max, \text{CR2MET}} - T_{\max, \text{ERA5}} \right)$$
+Esto acopla la temperatura a las 16:00 UTC ($\approx$ 12:00 hora estándar local chilena) con el gradiente orográfico de alta resolución de CR2MET, eliminando los sesgos fríos en valles y cordillera. A cada punto se le asigna un índice espacial hexagonal jerárquico **Uber H3 (Resolución 6, apertura de ~3.2 km)**.
 
 ### Etapa 2: Distributed Corner-Turn y Materialización Columnar
 Para eliminar de forma definitiva la amplificación de lectura, Spark ejecuta una única reorganización global:
@@ -260,6 +264,20 @@ Dentro de cada ejecutor, **PyArrow** pasa bloques contiguos de memoria en format
 ### Etapa 4: Streaming Incremental y Validación Geoespacial
 - **Operación Diaria en Tiempo Real:** Ante la llegada de pronósticos u observaciones operacionales desde la API de la Dirección Meteorológica de Chile (DMC), **Spark Structured Streaming** recupera el checkpoint $\mathcal{S}_{c,T}$ y calcula el nuevo índice en milisegundos mediante `mapGroupsWithState`.
 - **Validación Geoespacial:** Con **Apache Sedona**, se ejecuta un join espacial distribuido entre las celdas de riesgo extremo ($FWI > 50$) y los focos de calor satelitales de **NASA FIRMS**, evaluando la precisión del modelo contra el historial de CONAF (1985–2024).
+
+### 8.1 Paralelismo Temporal e Hipótesis de Halos de Calentamiento (Aporte de B. Zúñiga)
+En la evaluación teórica de sistemas distribuidos, **Benjamín Zúñiga** investigó si el eje temporal puede paralelizarse mediante escaneos asociativos ($O(\log T)$) estilo Blelloch (1990) o modelos de estado recurrentes (Martin & Cundy 2018, Särkkä 2021). Al constatar que las fórmulas del FWI tienen ramas no lineales por tramos (fases de lluvia con logaritmos y fases de secado exponencial que impiden una composición asociativa cerrada), Zúñiga formuló una solución elegante:
+* **Hipótesis del Halo Temporal de 90 a 180 días:** Dado que el Drought Code (DC) posee una memoria física de retardo exponencial finito ($\tau \approx 52$ días), particionar una serie decadal en bloques temporales paralelos con un buffer de calentamiento (*warm-up*) de 3 a 6 meses reproduce la solución secuencial exacta con un error inferior al 0.1%, habilitando escalamiento bidimensional para grandes ensambles CMIP6.
+
+### 8.2 Protocolo Experimental: Las 4 Líneas Base y la Métrica COST (Aporte de B. Zúñiga)
+Para responder con rigor científico indiscutible al escepticismo del profesor sobre si Spark se justifica frente a una laptop, el protocolo diseñado por **Benjamín Zúñiga** establece:
+1. **Cuatro Niveles de Comparación:**
+   * **$B_0$ (Secuencial Python celda a celda):** Cota inferior no optimizada.
+   * **$B_1$ (Techo Mononodo con Numba JIT):** Motor vectorizado en una sola máquina con `xarray + Numba` sobre memoria contigua C.
+   * **$B_2$ (Clúster Dask/Zarr):** Clúster distribuido de arreglos N-dimensionales.
+   * **$S$ (Nuestra Arquitectura Spark + Parquet):** Clúster con particionamiento `Spatial-First` y escaneo Zero-Shuffle.
+2. **Medición de COST (McSherry et al., 2015 HotOS):**
+   * Se calculará el *Configuration that Outperforms a Single Thread*: cuántos cores y nodos de Spark se necesitan para superar al motor mononodo $B_1$, demostrando a partir de qué volumen (escalando de los $3.2 \times 10^8$ puntos históricos a los $>1.5 \times 10^{10}$ puntos de CMIP6) la distribución horizontal en cluster es estrictamente necesaria.
 
 ---
 

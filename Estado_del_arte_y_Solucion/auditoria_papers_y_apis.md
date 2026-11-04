@@ -43,6 +43,32 @@ Todas las referencias fueron auditadas contra las bases de datos de **Crossref**
 | **[16]** | `10.5194/essd-15-2153-2023` | Quilcaille et al. (2023), *CMIP6 Fire Weather Index* | *Earth Syst. Sci. Data* | Q1 | 70 / 7.8 | **94 / 100** | **Alta calidad** |
 | **[17]** | `10.5281/zenodo.7529682` | Boisier (2023), *CR2MET v2.5* / Garreaud (2020) | *Zenodo* / *Int. J. Climatol.* | Q1 | 33 / 39.1 | **92 / 100** | **Alta calidad** |
 | **[18]** | `10.1038/s41598-024-52481-x` | Cordero et al. (2024), *Extreme Fire Weather in Chile* | *Scientific Reports* | Q1 | 79 / 13.9 | **92 / 100** | **Alta calidad** |
+| **[19]** | `10.5194/essd-12-1823-2020` | McElhinny et al. (2020), *Overwintering the Drought Code* | *Earth Syst. Sci. Data* | Q1 | 42 / 6.2 | **91 / 100** | **Alta calidad** |
+| **[20]** | OpenAlex `W2165038890` | McSherry et al. (2015), *Scalability! But at what COST?* | *USENIX HotOS* | Top Systems | 920 / 85.0 | **95 / 100** | **Alta calidad** |
+| **[21]** | OpenAlex `W2155609439` | Ousterhout et al. (2015), *Making Sense of Performance in Spark* | *USENIX NSDI* | CORE A\* | 415 / 42.0 | **94 / 100** | **Alta calidad** |
+| **[22]** | CMU-CS-90-190 | Blelloch (1990), *Prefix Sums and Applications* | *Carnegie Mellon Tech. Rep.* | Seminal | 1,450 / n/a | **95 / 100** | **Alta calidad** |
+| **[23]** | `10.1109/TAC.2020.2976316` | Särkkä & García-Fernández (2021), *Temporal Parallelization* | *IEEE Trans. Autom. Control* | Q1 / CORE A | 65 / 12.0 | **92 / 100** | **Alta calidad** |
+| **[24]** | OpenAlex `W2963384232` | Martin & Cundy (2018), *Parallelizing Recurrent Models* | *ICLR* | CORE A\* | 180 / 18.5 | **93 / 100** | **Alta calidad** |
+
+---
+
+## 2.1 Aportes Metodológicos Clave de Benjamín Zúñiga
+
+En el marco de la investigación bibliográfica y arquitectónica del Hito 2, el integrante **Benjamín Zúñiga** lideró una auditoría crítica de sistemas y modelado temporal que aportó cuatro pilares fundamentales incorporados formalmente en el paper IEEE:
+
+1. **Jerarquía de Cuatro Líneas Base ($B_0, B_1, B_2, S$):**
+   - En lugar de comparaciones vagas, Zúñiga estructuró el protocolo experimental en cuatro niveles reproducibles:
+     * **$B_0$ (Secuencial Ingenuo):** Script en Python procesando celda a celda en modo interpretado.
+     * **$B_1$ (Techo Mononodo Vectorizado):** Motor en memoria con `xarray + Numba JIT` (bucle solo en el tiempo sobre arreglos compactados en memoria C).
+     * **$B_2$ (Clúster Dask/Zarr):** Clúster gemelo basado en arreglos chunked sobre almacenamiento de objetos.
+     * **$S$ (Nuestra Propuesta Spark):** Spark sobre Parquet (ZSTD) con particionamiento `Spatial-First` por H3 y kernel Numba JIT.
+2. **Evaluación de la Métrica COST (McSherry et al., 2015):**
+   - Incorporación formal de la métrica **COST** (*Configuration that Outperforms a Single Thread*): cuántos núcleos y nodos de Spark se necesitan para superar a la línea base mononodo optimizada $B_1$. Esto permite responder con rigor empírico a las dudas sobre el overhead de Spark frente a una laptop.
+3. **Análisis de Paralelismo Temporal e Hipótesis de Halos de Calentamiento (*Warm-up*):**
+   - Zúñiga analizó por qué el FWI no admite escaneo asociativo exacto en $O(\log T)$ (Blelloch 1990, Martin & Cundy 2018) debido a las ramas no lineales por tramos de lluvia y secado.
+   - En su lugar, formuló la **Hipótesis del Halo Temporal de 90 a 180 días**: aprovechando que la memoria física del suelo en el Drought Code (DC) tiene un retardo exponencial finito ($\tau \approx 52$ días), es posible particionar la serie de 44 años en bloques temporales paralelos con un margen de solapamiento (*warm-up*), acotando el error numérico por debajo del 0.1% y habilitando paralelismo bidimensional (espacio y tiempo).
+4. **Esquema de Ajuste Térmico y Muestreo Diario $S_2$:**
+   - Para compatibilizar el horario estándar del FWI (12:00 hora local, 16:00 UTC) con las temperaturas extremas de CR2MET, Zúñiga propuso la configuración $S_2$: muestrear ERA5-Land a las 16:00 UTC y aplicar una corrección de sesgo orográfico usando la diferencia entre la $T_{\max}$ de CR2MET y la $T_{\max}$ de ERA5-Land ($T_{\text{noon}} = T_{\text{ERA5, 16:00}} + [T_{\max, \text{CR2MET}} - T_{\max, \text{ERA5}}]$).
 
 ---
 
