@@ -1,0 +1,109 @@
+% =====================================================================
+% Sistemas de Procesamiento para Big Data - UDP
+% Presentacion de propuesta de proyecto (5 minutos / 5 diapositivas)
+% Estructura: portada -> contexto -> problema -> relevancia -> datos
+% Compilar con: pdflatex presentacion_fwi.tex  (dos veces)
+% =====================================================================
+\documentclass[11pt,aspectratio=169]{beamer}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+% --- Tema y colores ---
+\usetheme{Madrid}
+\usecolortheme{whale}
+\definecolor{primaryblue}{RGB}{24,76,120}
+\setbeamercolor{structure}{fg=primaryblue}
+\setbeamercolor{frametitle}{bg=primaryblue,fg=white}
+\setbeamercolor{title}{bg=primaryblue,fg=white}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize items}[circle]
+
+% --- Datos del documento ---
+\title[Distributed FWI over Chile]{Distributed Computation of the Canadian Fire Weather Index (FWI)}
+\subtitle{Decadal high-resolution gridded climate data in Chile}
+\author[Group Members]{Agustín Pizarro \and Eduardo Valenzuela \and Benjamin Zuñiga}
+\institute[UDP]{Big Data Processing Systems --- Universidad Diego Portales \\ \small Instructor: Nicolás Hidalgo}
+\date{\today}
+
+\begin{document}
+
+% ----------------------- 1. Portada -----------------------
+\begin{frame}[plain]
+  \titlepage
+\end{frame}
+
+% ----------------------- 2. Contexto -----------------------
+\begin{frame}{Context}
+  \begin{itemize}
+    \item Chile faces unprecedented wildfire seasons: \textbf{2017}, over 570,000 hectares burned;
+          \textbf{2023}, over 430,000 hectares and dozens of casualties.
+    \item Driven by 15+ years of megadrought, homogeneous flammable vegetation, and extreme days
+          following the \textbf{30-30-30 rule} (T $>30^\circ$C, RH $<30\%$, wind $>30$ km/h).
+    \item CONAF and SENAPRED operate on the \textbf{Canadian Fire Weather Index (FWI) System}:
+          six interdependent sub-indices (FFMC, DMC, DC, ISI, BUI, FWI) that estimate fuel moisture
+          and expected fire intensity from daily weather.
+  \end{itemize}
+\end{frame}
+
+% ----------------------- 3. Problema -----------------------
+\begin{frame}{The problem we want to address}
+  \begin{itemize}
+    \item Today the FWI is computed \textbf{only} at automatic weather stations. Chile's network is sparse,
+          leaving \textbf{blind spots} in inner valleys and rural forest areas --- where recent megafires started.
+    \item Covering the country with an interpolated $5$ km climate grid means computing
+          $\sim$16,000 days $\times$ $\sim$20,000 cells $\approx \mathbf{3.2 \times 10^{8}}$ states.
+    \item The model is \textbf{recursive}: day $t$ depends on day $t-1$, so it cannot simply be split by date.
+      \[ FFMC_t = f(FFMC_{t-1},\, T_t,\, RH_t,\, W_t,\, P_t) \]
+    \item A single machine fails: out-of-memory on 44-year matrices, fragmented NetCDF reads,
+          and 30--50 hours per sequential run.
+  \end{itemize}
+\end{frame}
+
+% ----------------------- 4. Relevancia -----------------------
+\begin{frame}{Relevance}
+  \begin{itemize}
+    \item \textbf{Operational:} a nationwide daily fire danger map instead of a handful of isolated points,
+          directly useful for prevention and resource allocation.
+    \item \textbf{Scientific:} 44 years of reconstructed FWI enable trend analysis of fire danger
+          under the megadrought.
+    \item \textbf{Technical:} the case is a clean instance of a recurring Big Data challenge ---
+          distributing \textbf{stateful, time-recursive models} over massive gridded data without
+          saturating the network.
+  \end{itemize}
+  \vfill
+  \begin{alertblock}{Research question}
+    How to structure and partition a massive multi-decadal climate dataset on a distributed cluster
+    (Apache Spark) to compute time-recursive models efficiently?
+  \end{alertblock}
+\end{frame}
+
+% ----------------------- 5. Datos -----------------------
+\begin{frame}{Data we plan to work with}
+  \begin{table}
+    \centering
+    \small
+    \begin{tabular}{ll}
+      \toprule
+      Provider   & CR2, Universidad de Chile (\texttt{vismet.cr2.cl}) \\
+      Product    & \textbf{CR2MET v2.5} --- daily precipitation and max/min temperature \\
+      Format     & NetCDF-4, arrays \texttt{[time, lat, lon]} \\
+      Resolution & $0.05^\circ$ ($\approx 5$ km), continental Chile \\
+      Coverage   & 1979--2023, 44 years of continuous daily records \\
+      Volume     & Tens of GB compressed; $>320$ million states to compute \\
+      Variety    & Raster grids + station tables for validation + land cover \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+  \vfill
+  Processed with \textbf{Apache Spark} over \textbf{Apache Parquet}, partitioned by spatial cell so each
+  executor holds the full time series it needs.
+  \vfill
+  \centering
+
+\end{frame}
+
+\end{document}

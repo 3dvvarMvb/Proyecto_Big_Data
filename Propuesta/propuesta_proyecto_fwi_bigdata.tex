@@ -1,0 +1,300 @@
+\documentclass[11pt,a4paper]{article}
+
+% --- Paquetes Esenciales y Configuración de Idioma ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{tcolorbox}
+
+% --- Colores y Estilos ---
+\definecolor{primaryblue}{RGB}{24, 76, 120}
+\definecolor{secondaryblue}{RGB}{41, 128, 185}
+\definecolor{darkgray}{RGB}{50, 50, 50}
+\definecolor{lightgray}{RGB}{245, 247, 250}
+\definecolor{accentred}{RGB}{192, 57, 43}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=secondaryblue,
+    citecolor=secondaryblue,
+    urlcolor=primaryblue
+}
+
+% --- Encabezados y Pies de Página ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{darkgray}\textbf{Sistemas de Procesamiento para Big Data} -- UDP}
+\fancyhead[R]{\small\color{darkgray}Propuesta de Proyecto: FWI en Big Data}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% --- Formato de Títulos ---
+\titleformat{\section}{\Large\bfseries\color{primaryblue}}{\thesection.}{0.5em}{}[\titlerule]
+\titleformat{\subsection}{\large\bfseries\color{secondaryblue}}{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{darkgray}}{\thesubsubsection.}{0.5em}{}
+
+% --- Cajas de Texto Destacadas ---
+\newtcolorbox{alertbox}[1][]{
+    colback=lightgray,
+    colframe=secondaryblue,
+    fonttitle=\bfseries\color{white},
+    coltitle=white,
+    title=#1,
+    arc=3mm,
+    boxrule=1pt,
+    left=4mm, right=4mm, top=3mm, bottom=3mm
+}
+
+\newtcolorbox{warningbox}[1][]{
+    colback=lightgray,
+    colframe=accentred,
+    fonttitle=\bfseries\color{white},
+    coltitle=white,
+    title=#1,
+    arc=3mm,
+    boxrule=1pt,
+    left=4mm, right=4mm, top=3mm, bottom=3mm
+}
+
+% --- Datos del Documento ---
+\title{
+    \vspace{-1.5cm}
+    \Huge\textbf{\color{primaryblue}Propuesta de Proyecto: Cálculo Distribuido del Índice de Peligro Meteorológico de Incendios (FWI) a Escala Nacional}\\[0.3em]
+    \Large\color{darkgray}Sistemas de Procesamiento para Big Data -- Escuela de Informática y Telecomunicaciones (UDP)
+}
+\author{
+    \textbf{Integrantes del Grupo:} [Nombre 1, Nombre 2, Nombre 3]\\[0.2em]
+    \textbf{Profesor:} Dr. Nicolás Hidalgo (\texttt{nicolas.hidalgoc@mail.udp.cl})
+}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\noindent Este documento presenta la propuesta técnica y formal para el proyecto del curso \textit{Sistemas de Procesamiento para Big Data}. El objetivo es diseñar, implementar y evaluar una arquitectura de cómputo distribuido basada en \textbf{Apache Spark} y almacenamiento columnar optimizado (\textbf{Apache Parquet}) para calcular de forma masiva el Índice Canadiense de Peligro de Incendios Forestales (\textit{Fire Weather Index} - FWI) sobre las mallas climáticas diarias de alta resolución \textbf{CR2MET v2.5} (1979--2023). El problema aborda más de $3.2 \times 10^8$ celdas espacio-temporales y una recursión temporal intrínseca ($t$ depende de $t-1$) que colapsa computadores tradicionales por consumo de memoria RAM y tiempos de ejecución excesivos. Se detalla la justificación Big Data, la estrategia de particionamiento espacial para mitigar la saturación de red (\textit{shuffle}), el plan de validación experimental en clúster y el guion completo para la presentación oral de 5 minutos y las diapositivas en inglés.
+\end{abstract}
+
+\vspace{0.3cm}
+
+\begin{warningbox}[Reglas Críticas del Curso (Presentación e Informes)]
+\begin{itemize}[leftmargin=5mm, itemsep=1pt]
+    \item \textbf{Idioma Obligatorio:} De acuerdo a la diapositiva 12 del curso (\textit{Approval policy}): \textit{«All students reports and slides must be written in English»}. Por ende, las diapositivas de la presentación y el reporte IEEE final van en inglés.
+    \item \textbf{Tiempo de Presentación:} Exactamente \textbf{5 minutos} ($\sim$1 minuto por diapositiva $\approx$ 4 a 5 slides).
+    \item \textbf{Enfoque del Ramo:} Debe ser un problema genuino de \textbf{Sistemas de Big Data} (rendimiento distribuido, particionamiento, escalabilidad, I/O), no un simple script estadístico de Pandas en una sola máquina.
+\end{itemize}
+\end{warningbox}
+
+\section{Resumen Ejecutivo y Metadatos}
+
+\begin{itemize}[leftmargin=5mm]
+    \item \textbf{Título Oficial en Inglés:} \textit{Distributed Spatio-Temporal Computation of Canadian Fire Weather Index (FWI) over Decadal High-Resolution Gridded Climate Data in Chile}.
+    \item \textbf{Dataset Oficial:} CR2MET v2.5 (Centro de Ciencia del Clima y la Resiliencia, Universidad de Chile / \url{https://vismet.cr2.cl/}).
+    \item \textbf{Motor de Cómputo:} Apache Spark (PySpark / Scala) sobre clúster distribuido (modo Standalone / YARN).
+    \item \textbf{Capa de Almacenamiento:} Apache Parquet con compresión Snappy/ZSTD sobre HDFS o MinIO Object Storage.
+    \item \textbf{Paradigma de Procesamiento:} Batch Processing Masivo y Procesamiento de Tensores Multidimensionales.
+\end{itemize}
+
+\section{Contexto y Antecedentes}
+
+En la última década, Chile ha experimentado desastres por incendios forestales sin precedentes en su historia:
+\begin{itemize}[leftmargin=5mm]
+    \item \textbf{Temporada 2017 (``Tormenta de Fuego''):} Más de 570.000 hectáreas arrasadas y destrucción de poblados como Santa Olga.
+    \item \textbf{Temporada 2023:} Más de 430.000 hectáreas quemadas en las regiones de Ñuble, Biobío y La Araucanía, con decenas de víctimas fatales.
+\end{itemize}
+
+Este fenómeno se debe a una conjunción crítica: más de 15 años de megasequía continua, homogeneidad de vegetación altamente inflamable y eventos extremos marcados por la regla empírica \textbf{30-30-30} (Temperatura $>30^\circ\text{C}$, Humedad Relativa $<30\%$ y Viento $>30\text{ km/h}$).
+
+\subsection{El Sistema Canadiense Fire Weather Index (FWI)}
+El estándar operacional internacional utilizado por CONAF y SENAPRED es el \textbf{Canadian Forest Fire Weather Index (FWI) System}. Este modelo estratificado y no lineal calcula seis sub-índices interdependientes:
+\begin{enumerate}[leftmargin=6mm, itemsep=2pt]
+    \item \textbf{FFMC (\textit{Fine Fuel Moisture Code}):} Humedad de la hojarasca y combustibles finos superficiales (tiempo de respuesta rápido: desfase de 16 a 24 horas).
+    \item \textbf{DMC (\textit{Duff Moisture Code}):} Humedad de capas orgánicas intermedias en descomposición (tiempo de respuesta: $\sim$12 días).
+    \item \textbf{DC (\textit{Drought Code}):} Humedad de capas orgánicas profundas, indicador de sequía acumulada estacional (tiempo de respuesta: $\sim$52 días).
+    \item \textbf{ISI (\textit{Initial Spread Index}):} Tasa potencial de propagación combinando viento y FFMC.
+    \item \textbf{BUI (\textit{Buildup Index}):} Combustible total disponible para arder combinando DMC y DC.
+    \item \textbf{FWI (\textit{Fire Weather Index}):} Intensidad frontal esperada del fuego (número adimensional del peligro general).
+\end{enumerate}
+
+\subsection{El Problema de las Estaciones Meteorológicas}
+Históricamente, el FWI se calcula únicamente en las ubicaciones puntuales donde existen Estaciones Meteorológicas Automáticas (EMA). En Chile, la red de estaciones es sumamente escasa y dispersa debido a la compleja topografía andina, lo que deja enormes ``puntos ciegos'' sin monitoreo en valles interiores y zonas forestales rurales.
+
+\section{Definición y Motivación de la Problemática}
+
+\subsection{El Cuello de Botella Computacional}
+Para eliminar los puntos ciegos, se recurre a mallas climáticas interpoladas de alta resolución como \textbf{CR2MET v2.5}, que discretiza a Chile continental en una cuadrícula de $0.05^\circ \times 0.05^\circ$ ($\approx 5\text{ km} \times 5\text{ km}$), totalizando aproximadamente \textbf{20.000 celdas activas} durante \textbf{44 años de registros diarios continuos (1979--2023)}:
+\begin{itemize}[leftmargin=5mm]
+    \item \textbf{Profundidad temporal:} $\sim$16.000 días de registros diarios continuos.
+    \item \textbf{Volumen combinatorial:} $16.000\text{ días} \times 20.000\text{ celdas} \approx \mathbf{3.2 \times 10^8\text{ celdas espacio-temporales}}$.
+    \item \textbf{Dependencia de Estado Recursiva (\textit{Stateful Dependency}):} El FWI en el día $t$ depende estrictamente del estado acumulado en el día $t-1$:
+    \begin{align}
+        FFMC_t &= f(FFMC_{t-1}, T_t, RH_t, W_t, P_t) \\
+        DMC_t  &= g(DMC_{t-1}, T_t, RH_t, P_t, \text{mes}) \\
+        DC_t   &= h(DC_{t-1}, T_t, P_t, \text{mes})
+    \end{align}
+\end{itemize}
+
+\subsection{Por Qué Fracasan los Métodos Mononodo Tradicionales}
+\begin{enumerate}[leftmargin=5mm]
+    \item \textbf{Colapso de Memoria (\textit{Out of Memory} - OOM):} Cargar y manipular matrices climáticas multidimensionales de 44 años en herramientas de escritorio (Python/Pandas, R, QGIS) excede la memoria RAM física de cualquier computador convencional, congelando el sistema.
+    \item \textbf{Cuello de Botella de I/O en NetCDF:} El formato NetCDF original está diseñado para cortes espaciales globales o series de un solo punto; leer datos a través de miles de días genera lecturas de disco sumamente fragmentadas y lentas.
+    \item \textbf{Inviabilidad de Experimentación:} Un análisis histórico completo en un script secuencial toma entre 30 y 50 horas de cómputo ininterrumpido, imposibilitando la experimentación rápida y el ajuste de parámetros.
+\end{enumerate}
+
+\begin{alertbox}[Pregunta de Investigación del Proyecto]
+¿Cómo estructurar y particionar un dataset de tensores climáticos multidecadales masivos en un clúster distribuido (Apache Spark) para computar de forma eficiente modelos recursivos dependientes del tiempo, eliminando la sobrecarga de red (\textit{shuffle}) y los cuellos de botella de memoria?
+\end{alertbox}
+
+\section{Especificación de Datos y Dimensiones Big Data}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Dimensión} & \textbf{Especificación Técnica} \\
+\midrule
+\textbf{Proveedor Oficial} & Centro de Ciencia del Clima y la Resiliencia (CR2, Universidad de Chile / \url{vismet.cr2.cl}) \\
+\textbf{Producto} & CR2MET v2.5 (Mallas diarias de precipitación, temperatura máxima y mínima) \\
+\textbf{Formato Original} & NetCDF-4 (CF-1.6 compliant, arrays multidimensionales \texttt{[tiempo, lat, lon]}) \\
+\textbf{Resolución y Cobertura} & Grilla de $0.05^\circ$ ($\approx$ 5 km), Chile Continental ($17.5^\circ\text{S} - 56.0^\circ\text{S}$) \\
+\textbf{Volumen (Scale)} & Decenas de Gigabytes en arrays comprimidos; más de \textbf{320 millones de estados a calcular} \\
+\textbf{Velocidad} & Cómputo histórico en Batch (44 años) + capacidad de ingesta incremental diaria en verano \\
+\textbf{Variedad} & Arrays raster NetCDF-4, tablas de estaciones para validación y capas de cobertura de suelo \\
+\bottomrule
+\end{tabularx}
+\caption{Dimensiones de Big Data del proyecto FWI.}
+\end{table}
+
+\section{Arquitectura del Sistema y Estrategia de Procesamiento}
+
+La arquitectura propuesta se divide en tres capas fundamentales:
+
+\subsection{1. Capa de Ingesta y Almacenamiento Columnar}
+Los archivos crudos NetCDF se transforman a formato **Apache Parquet**, organizados columnarmente y ordenados por \texttt{(Cell\_ID, Timestamp)}.
+\begin{itemize}[leftmargin=5mm]
+    \item Se aplica compresión \textbf{Snappy} y \textbf{Zstandard (ZSTD)}.
+    \item Esto habilita \textit{Predicate Pushdown} y proyección de columnas en Spark SQL, reduciendo la lectura de disco en más de un 70\% en consultas analíticas (ej. filtrar regiones o periodos específicos).
+\end{itemize}
+
+\subsection{2. Estrategia de Cómputo: Spatial-First Partitioning}
+El principal desafío de sistemas distribuidos en este problema es evitar el **Shuffle masivo de red**:
+\begin{itemize}[leftmargin=5mm]
+    \item \textbf{El error habitual:} Si se particiona por fecha (un día por nodo), el día $t$ exige a cada nodo pedir por la red el estado del día $t-1$, saturando el clúster.
+    \item \textbf{Nuestra solución (\textit{Spatial-First Partitioning}):} Se particiona el dataset por \textbf{Identificador de Celda Espacial (\texttt{Cell\_ID})}.
+    \item Cada ejecutor de Spark recibe la serie de tiempo completa e ininterrumpida de 44 años para un subconjunto de celdas geográficas.
+    \item Dentro del ejecutor, la recursión temporal matemática del FWI se ejecuta localmente en memoria a velocidad nativa en C (usando Pandas UDFs vectorizadas con Apache Arrow / Numba), con \textbf{cero intercambio de datos por red entre nodos}.
+\end{itemize}
+
+\subsection{3. Capa Analítica y de Salida}
+El resultado se almacena en Parquet particionado, permitiendo consultas analíticas instantáneas en Spark SQL (ej. detección de días con condición 30-30-30 o rachas de sequía extrema).
+
+\section{Plan de Evaluación Experimental (Para el Paper IEEE)}
+
+\subsection{Métricas de Rendimiento en Sistemas Distribuidos}
+\begin{enumerate}[leftmargin=5mm]
+    \item \textbf{Speedup y Escalabilidad:} Medir el tiempo total de ejecución variando el número de núcleos/ejecutores de Spark (1, 2, 4, 8 cores).
+    \item \textbf{Benchmark de Formatos de Almacenamiento e I/O:} Comparar tamaño en disco y latencia de lectura entre: NetCDF crudo, CSV plano, Parquet Snappy y Parquet ZSTD.
+    \item \textbf{Sobrecarga de Red:} Comparar las métricas de \textit{Shuffle Read/Write} de Spark entre la partición espacial vs. la partición temporal para demostrar la eficiencia de la arquitectura.
+\end{enumerate}
+
+\subsection{Validación de Dominio}
+\begin{itemize}[leftmargin=5mm]
+    \item Contrastar los picos calculados de FWI contra las bitácoras históricas de incendios de CONAF durante las catástrofes de enero-febrero de 2017 y febrero de 2023.
+\end{itemize}
+
+\section{Guion y Diapositivas para la Presentación Oral (5 Minutos)}
+
+\noindent A continuación se detalla el contenido exacto de las 5 diapositivas (en inglés, como lo exige el curso) y el guion oral recomendado en español:
+
+\vspace{0.3cm}
+
+\begin{tcolorbox}[colback=white, colframe=primaryblue, title=\textbf{Slide 1: Title \& Authors (0:00 -- 0:30)}]
+\textbf{Slide Content (English):}
+\begin{itemize}[leftmargin=4mm, itemsep=1pt]
+    \item \textbf{Title:} Distributed Spatio-Temporal Computation of Fire Weather Danger (FWI) over Decadal Climate Grids in Chile
+    \item \textbf{Course:} Systems for Big Data Processing -- Elective Course, UDP
+    \item \textbf{Instructor:} Dr. Nicolás Hidalgo
+    \item \textbf{Team Members:} [Nombres de los integrantes]
+\end{itemize}
+\textbf{Guion Oral (Español):}
+\textit{«Buenos días profesor y compañeros. Hoy les presentaremos la definición de nuestro proyecto, el cual aborda el procesamiento distribuido de índices de peligro de incendios forestales a escala nacional, utilizando datos climáticos masivos de alta resolución y Apache Spark.»}
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=white, colframe=primaryblue, title=\textbf{Slide 2: Context \& Background (0:30 -- 1:30)}]
+\textbf{Slide Content (English):}
+\begin{itemize}[leftmargin=4mm, itemsep=1pt]
+    \item \textbf{Chile's Wildfire Crisis:} Over 1 million hectares burned in 2017 and 2023 megaseasons.
+    \item \textbf{Environmental Triggers:} 15-year megadrought and extreme ``30-30-30'' meteorological events ($T > 30^\circ\text{C}$, $RH < 30\%$, $W > 30\text{ km/h}$).
+    \item \textbf{Operational Standard:} Canadian Fire Weather Index (FWI) System (FFMC, DMC, DC, ISI, BUI, FWI).
+    \item \textbf{The Bottleneck:} Historically computed only at scarce physical weather stations, creating hazardous blind spots across rural territories.
+\end{itemize}
+\textbf{Guion Oral (Español):}
+\textit{«El contexto es crítico: en la última década, Chile ha sufrido megaincendios devastadores. El índice estándar para medir el peligro de fuego es el FWI canadiense, que modela la sequedad del combustible vegetal. El problema actual es que el FWI solo se calcula en estaciones meteorológicas físicas, las cuales son muy escasas en el país, dejando a la mayor parte del territorio rural a ciegas.»}
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=white, colframe=primaryblue, title=\textbf{Slide 3: Problem Motivation \& Systems Challenge (1:30 -- 2:45)}]
+\textbf{Slide Content (English):}
+\begin{itemize}[leftmargin=4mm, itemsep=1pt]
+    \item \textbf{The Objective:} Compute FWI continuously across continental Chile using the CR2MET gridded product ($\sim$5 km resolution).
+    \item \textbf{Big Data Scale:} 20,000 spatial cells $\times$ 16,000 days (1979--2023) = \textbf{$3.2 \times 10^8$ spatio-temporal evaluations}.
+    \item \textbf{Stateful Dependency:} Day $t$ calculations strictly depend on Day $t-1$ state ($FFMC_{t-1}, DMC_{t-1}, DC_{t-1}$).
+    \item \textbf{Why Traditional Systems Fail:} Single-node scripts (Python/R) suffer Out-Of-Memory (OOM) crashes and take dozens of hours per run.
+    \item \textbf{Research Challenge:} How to parallelize multi-decadal recursive arrays without network shuffle bottlenecks.
+\end{itemize}
+\textbf{Guion Oral (Español):}
+\textit{«Para solucionar esto, queremos calcular el FWI en todo Chile usando la grilla climática CR2MET. Esto genera un cuello de botella computacional masivo: 20.000 celdas por 44 años de datos diarios superan los 320 millones de estados a computar. Además, el FWI es recursivo: el día de hoy depende del estado acumulado de ayer. En un computador normal, los scripts colapsan por falta de memoria RAM y tardan días. Nuestro problema de investigación es cómo paralelizar este cálculo en un clúster distribuido sin que el traspaso de datos por red mate el rendimiento.»}
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=white, colframe=primaryblue, title=\textbf{Slide 4: Dataset \& Big Data Dimensions (2:45 -- 3:45)}]
+\textbf{Slide Content (English):}
+\begin{itemize}[leftmargin=4mm, itemsep=1pt]
+    \item \textbf{Dataset:} CR2MET v2.5 Gridded Climate Product (Center for Climate and Resilience Research / \url{vismet.cr2.cl}).
+    \item \textbf{Volume:} Tens of gigabytes in multidimensional NetCDF tensors (\texttt{[time, lat, lon]}).
+    \item \textbf{Velocity:} Decadal batch baseline + incremental daily processing during active wildfire seasons.
+    \item \textbf{Variety:} Multidimensional arrays (NetCDF-4), tabular weather station ground truth, and land-cover maps.
+\end{itemize}
+\textbf{Guion Oral (Español):}
+\textit{«Utilizaremos el dataset CR2MET v2.5 del CR2 de la Universidad de Chile. Cumple plenamente las dimensiones de Big Data: en volumen, son decenas de gigabytes en tensores multidimensionales NetCDF; en velocidad, permite el análisis histórico batch de 44 años y la ingesta incremental diaria en verano; y en variedad, integra arrays raster con datos tabulares de estaciones y capas de uso de suelo.»}
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=white, colframe=primaryblue, title=\textbf{Slide 5: Proposed Processing Architecture \& Evaluation (3:45 -- 5:00)}]
+\textbf{Slide Content (English):}
+\begin{itemize}[leftmargin=4mm, itemsep=1pt]
+    \item \textbf{Storage Layer:} NetCDF converted to partitioned Apache Parquet on HDFS/MinIO (Snappy/ZSTD).
+    \item \textbf{Processing Strategy: Spatial-First Partitioning in Apache Spark:}
+    \begin{itemize}[leftmargin=4mm]
+        \item Each executor receives the complete contiguous 44-year time series for a spatial tile.
+        \item Zero network shuffle during temporal recursive loops; localized vectorized execution (PyArrow/Numba).
+    \end{itemize}
+    \item \textbf{Evaluation Plan:}
+    \begin{itemize}[leftmargin=4mm]
+        \item Measure Speedup and Scale-up (1 to 8 worker cores).
+        \item Benchmark I/O throughput: NetCDF vs. CSV vs. Snappy/ZSTD Parquet.
+        \item Domain validation against historical CONAF wildfire ignition records (2017 \& 2023).
+    \end{itemize}
+\end{itemize}
+\textbf{Guion Oral (Español):}
+\textit{«Nuestra arquitectura propuesta resuelve el problema en dos capas: convertimos los tensores NetCDF a formato columnar Apache Parquet en almacenamiento distribuido. Luego, en Apache Spark aplicamos particionamiento espacial: cada ejecutor recibe la serie de tiempo completa de un cuadrante geográfico. Con esto, la recursión temporal se ejecuta en memoria local mediante funciones vectorizadas, logrando cero saturación de red por shuffle. Finalmente, evaluaremos la escalabilidad del sistema midiendo el Speedup con múltiples núcleos y validaremos la precisión de las alertas contrastándolas con los incendios reales de CONAF.»}
+\end{tcolorbox}
+
+\section{Referencias Bibliográficas Clave}
+
+\begin{enumerate}[leftmargin=6mm]
+    \item C. E. Van Wagner, ``Development and structure of the Canadian Forest Fire Weather Index System,'' \textit{Canadian Forestry Service}, Forestry Tech. Rep. 35, 1987.
+    \item M. Zaharia et al., ``Spark: Cluster Computing with Working Sets,'' in \textit{Proc. of USENIX HotCloud}, 2010.
+    \item J. P. Boisier et al., ``CR2MET: A high-resolution precipitation and temperature dataset for continental Chile,'' \textit{Center for Climate and Resilience Research (CR2)}, 2020.
+    \item B. Gedik, S. Schneider, M. Hirzel, and K.-L. Wu, ``Elastic scaling for data stream processing,'' \textit{IEEE Trans. Parallel Distrib. Syst.}, vol. 25, no. 6, pp. 1447--1463, 2014.
+\end{enumerate}
+
+\end{document}

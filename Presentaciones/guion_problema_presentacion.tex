@@ -1,0 +1,142 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{enumitem}
+\usepackage{titlesec}
+
+% --- Colores y Estilos ---
+\definecolor{primaryblue}{RGB}{24, 76, 120}
+\definecolor{secondaryblue}{RGB}{41, 128, 185}
+\definecolor{darkgray}{RGB}{35, 35, 35}
+\definecolor{lightgray}{RGB}{248, 249, 250}
+\definecolor{accentgreen}{RGB}{39, 174, 96}
+\definecolor{accentred}{RGB}{192, 57, 43}
+
+\titleformat{\section}{\Large\bfseries\color{primaryblue}}{\thesection.}{0.5em}{}[\titlerule]
+\titleformat{\subsection}{\large\bfseries\color{secondaryblue}}{\thesubsection.}{0.5em}{}
+
+\newtcolorbox{speechbox}[1][]{
+    colback=lightgray,
+    colframe=primaryblue,
+    fonttitle=\bfseries\large\color{white},
+    title=#1,
+    arc=3mm,
+    boxrule=1.2pt,
+    left=5mm, right=5mm, top=4mm, bottom=4mm
+}
+
+\newtcolorbox{actionbox}[1][]{
+    colback=white,
+    colframe=accentgreen,
+    fonttitle=\bfseries\color{white},
+    title=#1,
+    arc=2mm,
+    boxrule=1pt,
+    left=4mm, right=4mm, top=3mm, bottom=3mm
+}
+
+\newtcolorbox{defensebox}[1][]{
+    colback=white,
+    colframe=accentred,
+    fonttitle=\bfseries\color{white},
+    title=#1,
+    arc=2mm,
+    boxrule=1pt,
+    left=4mm, right=4mm, top=3mm, bottom=3mm
+}
+
+\begin{document}
+
+\begin{center}
+    {\Huge\textbf{\color{primaryblue}Monólogo de Exposición Oral}}\\[0.4em]
+    {\Large\textbf{Diapositiva: ``The problem we want to address''}}\\[0.3em]
+    \textbf{Curso:} Sistemas de Procesamiento para Big Data -- UDP\\
+    \textbf{Profesor:} Dr. Nicolás Hidalgo \quad | \quad \textbf{Expositor:} Eduardo Valenzuela\\
+    \textbf{Duración estimada:} 1 minuto con 20 segundos
+\end{center}
+
+\vspace{0.3cm}
+
+\begin{actionbox}[Indicaciones Previas a Exponer]
+\begin{itemize}[leftmargin=5mm, itemsep=3pt]
+    \item \textbf{La transición:} Tu compañero termina de explicar el contexto del fuego. Entras tú con voz enérgica: \textit{«Habiendo entendido el contexto, ¿cuál es el problema concreto que queremos abordar?...»}
+    \item \textbf{Postura y mirada:} No leas la pantalla. Mira de frente al profesor y a tus compañeros. Usa la diapositiva solo como respaldo visual.
+    \item \textbf{Énfasis:} Remarca con fuerza las palabras: \textbf{puntos ciegos}, \textbf{320 millones de estados}, \textbf{recursivo con estado}, y \textbf{Out-of-Memory}.
+\end{itemize}
+\end{actionbox}
+
+\vspace{0.2cm}
+
+\section{El Monólogo Completo (Texto a Decir)}
+
+\begin{speechbox}[Guion Oral Paso a Paso -- Decir con naturalidad y seguridad]
+
+\noindent \textit{[Paso 1: La entrada y el dolor real en Chile]}  
+\noindent ``Muchas gracias. Habiendo entendido el contexto, \textbf{¿cuál es el problema concreto que queremos abordar?}
+
+\vspace{0.3cm}
+\noindent Actualmente en Chile, el índice FWI se calcula \textbf{únicamente} en las estaciones meteorológicas automáticas de la Dirección Meteorológica o la DGA. Sin embargo, nuestra red física es sumamente escasa y está concentrada en valles urbanos y la costa. Esto genera enormes \textbf{puntos ciegos} en los valles interiores y zonas forestales rurales; precisamente allí donde se originaron las grandes catástrofes de 2017 y 2023. Para prevenir de verdad, no podemos seguir mirando 20 puntos aislados en un mapa: necesitamos monitorear el peligro de forma continua sobre todo el territorio nacional.
+
+\vspace{0.3cm}
+\noindent \textit{[Paso 2: La dimensión del Big Data]}  
+\noindent La solución natural es utilizar una malla climática de alta resolución como \textbf{CR2MET}, que cubre a Chile continental en cuadrículas de 5 kilómetros. Pero aquí es donde nos encontramos de frente con la barrera de \textbf{Big Data}:
+\begin{itemize}[leftmargin=5mm, itemsep=2pt]
+    \item Tenemos aproximadamente \textbf{20.000 celdas activas} a lo largo de \textbf{44 años de registros diarios continuos} (más de 16.000 días).
+    \item Esto significa calcular más de \textbf{320 millones de estados espacio-temporales} ($3.2 \times 10^8$).
+\end{itemize}
+
+\vspace{0.3cm}
+\noindent \textit{[Paso 3: El reto de Sistemas Distribuidos (Señala la fórmula en la pantalla)]}  
+\noindent Y el verdadero desafío en sistemas distribuidos no es solo el volumen, sino que el modelo es \textbf{estrictamente recursivo con estado}: como vemos en la fórmula, el valor de combustible fino de hoy en el día $t$, depende forzosamente del estado que calculamos ayer en el día $t-1$. Arrastra la memoria del suelo. Por lo tanto, no podemos simplemente partir el dataset por fechas de forma ingenua, porque cada día requeriría comunicarse por red con el día anterior.
+
+\vspace{0.3cm}
+\noindent \textit{[Paso 4: Por qué falla una máquina tradicional y cierre]}  
+\noindent Si intentamos correr esto en una sola máquina con herramientas tradicionales como Python, R o QGIS, el sistema \textbf{colapsa por completo}: arroja errores de \textit{Out-of-Memory} por la sobrecarga de matrices multidimensionales NetCDF, sufre por lecturas de disco fragmentadas y una corrida secuencial tardaría entre \textbf{30 y 50 horas}.
+
+\vspace{0.3cm}
+\noindent En resumen: tenemos un problema crítico de país, una escala masiva de datos y un algoritmo recursivo que exige una arquitectura de cómputo distribuido. Ahora, mi compañero les explicará la relevancia e impacto de resolver esto.''
+\end{speechbox}
+
+\newpage
+
+\section{Guía Rápida por Viñeta (Lo que dice la diapositiva vs. Lo que explicas)}
+
+\begin{enumerate}[leftmargin=6mm, itemsep=10pt]
+    \item \textbf{Viñeta 1 de tu Slide:}  
+    \textit{«Today the FWI is computed only at automatic weather stations. Chile's network is sparse, leaving blind spots in inner valleys and rural forest areas...»}  
+    $\to$ \textbf{Lo que dices:} Las estaciones físicas no alcanzan y están en ciudades, dejando a oscuras las zonas forestales donde parten los incendios.
+
+    \item \textbf{Viñeta 2 de tu Slide:}  
+    \textit{«Covering the country with an interpolated 5 km climate grid means computing $\sim$16,000 days $\times$ $\sim$20,000 cells $\approx \mathbf{3.2 \times 10^{8}}$ states.»}  
+    $\to$ \textbf{Lo que dices:} Mencionas la escala de Big Data con seguridad: 20 mil celdas por 44 años son más de 320 millones de cálculos.
+
+    \item \textbf{Viñeta 3 de tu Slide:}  
+    \textit{«The model is recursive: day $t$ depends on day $t-1$, so it cannot simply be split by date. $FFMC_t = f(FFMC_{t-1}, ...)$»}  
+    $\to$ \textbf{Lo que dices:} Es un modelo con memoria. El hoy depende del ayer. No se puede cortar por fecha porque saturaría la red de un clúster.
+
+    \item \textbf{Viñeta 4 de tu Slide:}  
+    \textit{«A single machine fails: out-of-memory on 44-year matrices, fragmented NetCDF reads, and 30--50 hours per sequential run.»}  
+    $\to$ \textbf{Lo que dices:} En un computador mononodo la memoria RAM explota (OOM), el formato NetCDF no rinde y tarda 2 días. Necesitamos computación distribuida.
+\end{enumerate}
+
+\vspace{0.4cm}
+
+\section{Si el Profesor Nicolás Hidalgo te interrumpe a TI}
+
+\begin{defensebox}[Pregunta 1: «¿Por qué no lo dividen por fecha y ya?»]
+\textbf{Tu respuesta:}  
+\textit{«Porque como el día $t$ necesita el estado del día $t-1$, si dividimos por fecha, los nodos del clúster tendrían que pasarse información por la red en cada uno de los 16.000 días. Ese shuffle masivo colapsaría el rendimiento. Por eso proponemos particionar por celda espacial.»}
+\end{defensebox}
+
+\begin{defensebox}[Pregunta 2: «¿Por qué dicen que NetCDF lee fragmentado?»]
+\textbf{Tu respuesta:}  
+\textit{«Porque los archivos NetCDF están guardados como fotos espaciales día a día. Para leer 44 años seguidos de una sola celda, el disco tiene que dar miles de saltos pequeños, destruyendo la velocidad de lectura. Por eso en el proyecto los convertimos a Parquet columnar.»}
+\end{defensebox}
+
+\end{document}
